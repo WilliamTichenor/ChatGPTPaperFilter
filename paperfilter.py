@@ -1,18 +1,81 @@
 import os
+import asyncio
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI, RateLimitError
 import rispy
+
+
+async def apiCall(entry):
+  paperPrompt = f"""
+    Title: {entry['title']}
+    Year: {entry['year']}
+    Abstract: {entry['notes_abstract']}
+  """
+  async with semaphore:
+    while True:
+      try:
+        response = await client.chat.completions.create(
+          model="gpt-4o-mini",
+          messages=[sysPrompt, {"role": "user", "content": paperPrompt}]
+        )
+        return [entry, response]
+      except RateLimitError as e:
+        print("Rate limited! Waiting 10s...")
+        await asyncio.sleep(10)
+        continue
+      except Exception as e:
+
+        return ["Error", e]
+
+async def main():
+  invalid = 0
+  with open(fpath, 'r', encoding="utf-8-sig") as dataFile:
+    data = rispy.load(dataFile)
+    tasks = [apiCall(entry) for entry in data]
+
+    i = 0
+    for completed_task in asyncio.as_completed(tasks):
+      response = await completed_task
+      i += 1
+      if (response[0]=="Error"):
+        print(str(i)+"/"+str(len(data))+": LLM Error: "+str(response[1]))
+        invalid += 1
+      elif (response[1].choices[0].message.content == "YES"):
+        yes.append(response[0])
+        print(str(i)+"/"+str(len(data))+": YES: "+response[0]['title'])
+      elif (response[1].choices[0].message.content == "NO"):
+        no.append(response[0])
+        print(str(i)+"/"+str(len(data))+": NO: "+response[0]['title'])
+      elif (response[1].choices[0].message.content == "MAYBE"):
+        maybe.append(response[0])
+        print(str(i)+"/"+str(len(data))+": MAYBE: "+response[0]['title'])
+      else:
+        print(str(i)+"/"+str(len(data))+": Invalid answer: "+response[1].choices[0].message.content)
+        invalid += 1
+        continue
+        
+         
+        
+    print("Filter Complete!")
+    print(str(len(yes))+" "+"yes")
+    print(str(len(no))+" "+"no")
+    print(str(len(maybe))+" "+"maybe")
+    print(str(invalid)+" "+"invalid")
+    with open("output/yes.ris", 'w', encoding="utf-8-sig") as dataFile:
+            rispy.dump(yes, dataFile)
+    with open("output/no.ris", 'w', encoding="utf-8-sig") as dataFile:
+            rispy.dump(no, dataFile)
+    with open("output/maybe.ris", 'w', encoding="utf-8-sig") as dataFile:
+            rispy.dump(maybe, dataFile)
 
 
 load_dotenv()
 
-client = OpenAI(
+client = AsyncOpenAI(
   api_key=os.getenv('API_KEY')
 )
 
-msgs = []
-
-prompt = """
+sysPrompt = {"role": "system", "content": """
   You will be provided with a series of references, including their title, the year published, and abstract. The format will look like this:
 
   Title: Vaccine safety, vaccine effectiveness and other determinants for successful immunization programmes.
@@ -24,57 +87,18 @@ prompt = """
   2. Should be published 2020 or later; 
   3. Should test an intervention; 
   4. Should evaluate vaccine uptake, knowledge, attitudes and beliefs, or intent to vaccinate. 
-  Give your answer as "YES", "MAYBE", or "NO".
-"""
-msgs.append({"role": "system", "content": prompt})
+  Give your answer as "YES", "MAYBE", or "NO"; Your answer should consist of nothing but one of these words.
+"""}
 
 yes = []
 no = []
 maybe = []
-invalid = 0
 contextLimit = 10
 context = []
 
+SEMAPHORE_LIMIT = 15
+semaphore = asyncio.Semaphore(SEMAPHORE_LIMIT)
+
 fpath = "testing500.ris"
-with open(fpath, 'r', encoding="utf-8-sig") as dataFile:
-  data = rispy.load(dataFile)
-  i = 1
-  for entry in data:
-    paperPrompt = f"""
-      Title: {entry['title']}
-      Year: {entry['year']}
-      Abstract: {entry['notes_abstract']}
-    """
-    if (len(context) >= contextLimit*2):
-      context.pop(0)
-      context.pop(0)
-    context.append({"role": "user", "content": paperPrompt})
-    completion = client.chat.completions.create(
-      model="gpt-4o-mini",
-      messages=[{"role": "system", "content": prompt}]+context
-    )
-    context.append({"role": "assistant", "content": completion.choices[0].message.content})
-    if (completion.choices[0].message.content == "YES"):
-      yes.append(entry)
-    elif (completion.choices[0].message.content == "NO"):
-      no.append(entry)
-    elif (completion.choices[0].message.content == "MAYBE"):
-      maybe.append(entry)
-    else:
-      print("Invalid answer from LLM.")
-      invalid += 1
-    print(str(i)+"/"+str(len(data))+": "+entry['title'])
-    i += 1
 
-
-print("Filter Complete!")
-print(str(len(yes))+" "+"yes")
-print(str(len(no))+" "+"no")
-print(str(len(maybe))+" "+"maybe")
-print(str(invalid)+" "+"invalid")
-with open("output/yes.ris", 'w', encoding="utf-8-sig") as dataFile:
-        rispy.dump(yes, dataFile)
-with open("output/no.ris", 'w', encoding="utf-8-sig") as dataFile:
-        rispy.dump(no, dataFile)
-with open("output/maybe.ris", 'w', encoding="utf-8-sig") as dataFile:
-        rispy.dump(maybe, dataFile)
+asyncio.run(main())
