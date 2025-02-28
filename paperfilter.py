@@ -1,4 +1,5 @@
 import os
+import sys
 import pickle
 import asyncio
 from dotenv import load_dotenv
@@ -130,7 +131,7 @@ sysPrompt = {"role": "system", "content": """
   Give your answer as "NO" if any criteria are clearly violated
 """}
 
-fpath = "testing500.ris"
+fpath = sys.argv[1]
 
 yes = []
 no = []
