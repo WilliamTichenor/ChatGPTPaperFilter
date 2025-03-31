@@ -7,6 +7,12 @@ Setup:
 pip install -r requirements.txt
 ```
 
+Create a file called .env, containing the following:
+```
+API_KEY = "<api key goes here>"
+```
+To obtain an API key, visit https://openai.com/ to create an account and purchase API credits.
+
 
 Configuration: (All options can be found at the top of paperfilter.py)
 
