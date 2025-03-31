@@ -10,6 +10,7 @@ import rispy
 SEMAPHORE_LIMIT = 7 #If you're getting rate limited too much, drop this!
 GPTMODEL = "gpt-4o" #Tested with gpt-4o and gpt-4o-mini
 BACKUPDELAY = 900 #Time, in seconds, between backups
+COMBINEYESMAYBE = False #Whether to combine yes and maybe results into a single file
 
 async def apiCall(index, entry):
   paperPrompt = f"""
@@ -104,12 +105,16 @@ async def main():
     print(str(len(maybe))+" "+"maybe")
     print(str(invalid)+" "+"invalid")
     os.makedirs("output", exist_ok = True)
-    with open("output/yes.ris", 'w', encoding="utf-8-sig") as dataFile:
-            rispy.dump(yes, dataFile)
+    if COMBINEYESMAYBE:
+       with open("output/yesmaybe.ris", 'w', encoding="utf-8-sig") as dataFile:
+            rispy.dump(yes+maybe, dataFile)
+    else:
+      with open("output/yes.ris", 'w', encoding="utf-8-sig") as dataFile:
+              rispy.dump(yes, dataFile)
+      with open("output/maybe.ris", 'w', encoding="utf-8-sig") as dataFile:
+              rispy.dump(maybe, dataFile)
     with open("output/no.ris", 'w', encoding="utf-8-sig") as dataFile:
             rispy.dump(no, dataFile)
-    with open("output/maybe.ris", 'w', encoding="utf-8-sig") as dataFile:
-            rispy.dump(maybe, dataFile)
     if os.path.isfile(fpath+".sav"):
       os.remove(fpath+".sav")
 
